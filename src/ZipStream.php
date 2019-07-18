@@ -354,13 +354,14 @@ class ZipStream
     public function finish(): void
     {
         // add trailing cdr file records
-        foreach ($this->files as $cdrFile) {
-            $this->send($cdrFile);
+        $count = count($this->files);
+        foreach ($this->files as $position => $cdrFile) {
+            $this->send($cdrFile, $position === $count - 1);
             $this->cdr_ofs = $this->cdr_ofs->add(Bigint::init(strlen($cdrFile)));
         }
 
         // Add 64bit headers (if applicable)
-        if (count($this->files) >= 0xFFFF ||
+        if ($count >= 0xFFFF ||
             $this->cdr_ofs->isOver32() ||
             $this->ofs->isOver32()) {
             if (!$this->opt->isEnableZip64()) {
@@ -450,9 +451,10 @@ class ZipStream
      * Flush output after write if configure option is set.
      *
      * @param String $str
+     * @param bool   $flushForbidden When "flushOutput" option is enabled, this flag (=true) will forbid flushing the buffer while sending the list file.
      * @return void
      */
-    public function send(string $str): void
+    public function send(string $str, bool $flushForbidden = false): void
     {
         if ($this->need_headers) {
             $this->sendHttpHeaders();
@@ -461,7 +463,7 @@ class ZipStream
 
         fwrite($this->opt->getOutputStream(), $str);
 
-        if ($this->opt->isFlushOutput()) {
+        if (!$flushForbidden && $this->opt->isFlushOutput()) {
             flush();
             ob_flush();
         }
